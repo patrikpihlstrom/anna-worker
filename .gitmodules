@@ -1,0 +1,6 @@
+[submodule "docker-anna-firefox"]
+	path = docker-anna-firefox
+	url = git@github.com:patrikpihlstrom/docker-anna-firefox.git
+[submodule "docker-anna-chrome"]
+	path = docker-anna-chrome
+	url = git@github.com:patrikpihlstrom/docker-anna-chrome.git

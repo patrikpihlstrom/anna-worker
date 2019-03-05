@@ -1,0 +1,12 @@
+venv
+venv27
+.idea
+api/__pychace__
+*.db
+*.pyc
+*.log
+build
+dist
+anna_api.egg-info
+*.swp
+.coverage
