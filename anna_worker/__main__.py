@@ -14,4 +14,4 @@ if __name__ == '__main__':
 		worker = Worker(2)
 		while True:
 			worker.update()  # <intended API endpoint>:<data>
-			client.update(worker.jobs)
+			client.update([job for job in worker.jobs if job.changed])
