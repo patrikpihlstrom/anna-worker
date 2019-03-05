@@ -1,3 +1,4 @@
+import copy
 import re
 
 import docker
@@ -20,15 +21,11 @@ class Worker:
 		self.prune()
 		self.client.close()
 
-	def run(self):
-		"""
-		Prune & start working through the queue
-		"""
-		while True:
-			self.keep_hub_alive()  # Make sure the hub is running
-			self.update_jobs()  # Retrieve logs & handle containers
-			if self.can_run_more():  # Check if we can run more concurrent containers
-				self.start_next_job()  # Get the next job in the queue and fire up a container
+	def update(self):
+		self.keep_hub_alive()  # Make sure the hub is running
+		self.update_jobs()  # Retrieve logs & handle containers
+		if self.can_run_more():  # Check if we can run more concurrent containers
+			self.start_next_job()  # Get the next job in the queue and fire up a container
 
 	def keep_hub_alive(self):
 		"""
@@ -126,19 +123,11 @@ class Worker:
 
 	def get_logs(self, job):
 		container = self.get_container(job)
-		log = job.log
 		if container is not False:
 			job.log = re.sub("\\x1b\[0m|\\x1b\[92m|\\x1b\[91m|\\x1b\[93m", '', container.logs().decode('utf-8'))  # colorless
 		else:
 			job.log = 'unable to get logs from container'
-
-		# TODO: move this to the client
-		#if not os.path.isdir('/tmp/anna/' + job.tag):
-		#	os.mkdir('/tmp/anna/' + job.tag)
-		#if log != job.log:
-		#	f = open('/tmp/anna/' + job.tag + '/anna.log', 'a+')
-		#	f.write('\n' + job.log)
-		#	f.close()
+		job.changed = True
 
 	def can_run_more(self):
 		"""
@@ -203,8 +192,6 @@ class Worker:
 		:param job:
 		:return:
 		"""
-		#if not os.path.isdir('/tmp/anna'):
-		#	os.mkdir('/tmp/anna')
 		image, volumes, command = job.get_image_volumes_and_command()
 		return self.client.containers.run(
 			image=image,
