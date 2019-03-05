@@ -14,4 +14,12 @@ if __name__ == '__main__':
 		worker = Worker(2)
 		while True:
 			worker.update()  # <intended API endpoint>:<data>
-			client.update([job for job in worker.jobs if job.changed])
+			if len(worker.jobs) > 0:
+				client.update([job.dict() for job in worker.jobs if job.changed])
+				for job in worker.jobs:
+					if job.changed:
+						job.changed = False
+			if worker.should_request_work():
+				job = client.request_job()
+				if isinstance(job, dict):
+					worker.append(job)

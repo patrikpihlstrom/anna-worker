@@ -15,3 +15,11 @@ class Job(object):
 		return ('patrikpihlstrom/anna-' + self.driver + ':latest', {'/tmp/anna/': {'bind': '/tmp', 'mode': 'rw'}},
 		        'python3 /home/seluser/anna/anna/__main__.py -v -H -d ' + self.driver + ' -i ' + str(
 			        self.id) + ' -s ' + self.site + ' -t ' + self.token + ' --host ' + self.host)
+
+	def dict(self):
+		return {'id': self.id, 'tag': self.tag, 'driver': self.driver,
+		        'site': self.site, 'container': self.container,
+		        'status': self.status, 'log': self.log}
+
+
+attributes = ('id', 'container', 'driver', 'site', 'status', 'tag', 'log')

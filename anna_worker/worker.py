@@ -1,8 +1,9 @@
-import copy
 import re
 
 import docker
 from docker import errors
+
+import job
 
 
 class Worker:
@@ -40,7 +41,8 @@ class Worker:
 					self.keep_hub_alive()
 			except docker.errors.NotFound:
 				try:
-					self.hub = self.client.containers.run('selenium/hub', name='hub', ports={'4444/tcp': 4444}, detach=True)
+					self.hub = self.client.containers.run('selenium/hub', name='hub', ports={'4444/tcp': 4444},
+					                                      detach=True)
 				except docker.errors.APIError:
 					self.hub.stop()
 					self.keep_hub_alive()
@@ -70,7 +72,7 @@ class Worker:
 		:param job:
 		:return:
 		"""
-		if len(job.container) > 0:
+		if job.container is not None and len(job.container) > 0:
 			container = self.get_container(job)
 			if container is not False:
 				return container.status in ('starting', 'running')
@@ -92,9 +94,9 @@ class Worker:
 		else:
 			try:
 				if len(result) != 2 or int(result[0]) != int(result[1]):
-						job.status = 'failed'
+					job.status = 'failed'
 				else:
-						job.status = 'done'
+					job.status = 'done'
 			except ValueError:
 				job.status = 'error'
 
@@ -124,7 +126,8 @@ class Worker:
 	def get_logs(self, job):
 		container = self.get_container(job)
 		if container is not False:
-			job.log = re.sub("\\x1b\[0m|\\x1b\[92m|\\x1b\[91m|\\x1b\[93m", '', container.logs().decode('utf-8'))  # colorless
+			job.log = re.sub("\\x1b\[0m|\\x1b\[92m|\\x1b\[91m|\\x1b\[93m", '',
+			                 container.logs().decode('utf-8'))  # colorless
 		else:
 			job.log = 'unable to get logs from container'
 		job.changed = True
@@ -204,3 +207,16 @@ class Worker:
 		for job in self.jobs:
 			if job.status == 'pending':
 				return job
+
+	def should_request_work(self):
+		if self.can_run_more():
+			return False
+		if len(self.jobs) == 0:
+			return True
+		return False
+
+	def append(self, new_job):
+		if not isinstance(new_job, dict) or any(attribute not in new_job for attribute in job.attributes):
+			raise TypeError
+		self.jobs.append(job.Job(id=new_job['id'], container=new_job['container'], driver=new_job['driver'], site=new_job['site'],
+		                         status=new_job['status'], tag=new_job['tag'], log=new_job['log']))
