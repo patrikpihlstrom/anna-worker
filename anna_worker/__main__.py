@@ -23,6 +23,7 @@ if __name__ == '__main__':
 						else:
 							job.changed = False
 			if worker.should_request_work():
+				worker.prune()
 				job = client.request_job()
 				if isinstance(job, dict):
 					worker.append(job)
