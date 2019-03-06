@@ -5,12 +5,13 @@ with open('README.md', 'r') as f:
 
 setuptools.setup(
     name='anna-worker',
-    version='0.0.1',
+    version='0.0.2',
     author='Patrik Pihlstrom',
     author_email='patrik.pihlstrom@gmail.com',
     url='https://github.com/patrikpihlstrom/anna-worker',
     description='anna worker',
     long_description=description,
     long_description_content_type='text/markdown',
-    packages=['anna_worker']
+    packages=['anna_worker'],
+    install_requires=['anna_common', 'anna_client', 'docker']
 )

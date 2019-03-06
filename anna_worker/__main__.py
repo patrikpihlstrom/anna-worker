@@ -18,7 +18,10 @@ if __name__ == '__main__':
 				client.update([job.dict() for job in worker.jobs if job.changed])
 				for job in worker.jobs:
 					if job.changed:
-						job.changed = False
+						if job.status in ('done', 'failed', 'error', 'rm'):
+							worker.jobs.remove(job)
+						else:
+							job.changed = False
 			if worker.should_request_work():
 				job = client.request_job()
 				if isinstance(job, dict):

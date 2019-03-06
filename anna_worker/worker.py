@@ -1,4 +1,5 @@
 import re
+import time
 
 import docker
 from docker import errors
@@ -17,6 +18,7 @@ class Worker:
 		self.hub = None
 		self.jobs = []
 		self.container_options = {'links': {'hub': 'hub'}, 'shm_size': '2G', 'detach': True}
+		self.last_job_request_time = 0
 
 	def __del__(self):
 		self.prune()
@@ -209,9 +211,10 @@ class Worker:
 				return job
 
 	def should_request_work(self):
-		if self.can_run_more():
+		if time.time() - self.last_job_request_time < 3 or self.can_run_more():
 			return False
 		if len(self.jobs) == 0:
+			self.last_job_request_time = time.time()
 			return True
 		return False
 
