@@ -12,12 +12,14 @@ last_status_check = 0
 
 
 def update():
+	global last_status_check
 	try:
 		worker.prune()
 	except errors.APIError:
 		pass
 	if time.time() - last_status_check >= 3:
 		remove_manually_stopped_jobs_from_host()
+		last_status_check = time.time()
 	worker.update()
 	if len(worker.jobs) > 0:
 		client.update([job.dict() for job in worker.jobs if job.changed])

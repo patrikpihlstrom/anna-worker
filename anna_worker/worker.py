@@ -106,11 +106,14 @@ class Worker:
 
 	def stop_container(self, job):
 		container = self.get_container(job)
-		if container is not False and container.status == 'running':
-			container.stop()
+		if container is not False:
+			self.get_logs(job)
+			if container.status == 'running':
+				container.stop()
+				container.remove()
 
 	def get_container(self, job):
-		if len(job.container) == 0:
+		if job.container is None:
 			return False
 		try:
 			return self.client.containers.get(job.container)
@@ -120,15 +123,11 @@ class Worker:
 	def prune(self):
 		try:
 			for job in self.jobs:
-				if job.container is not None and job.status in ('rm', 'error', 'failed', 'done'):
+				if job.log is None and job.container is not None and job.status in (
+						'rm', 'error', 'failed', 'done'):
 					self.stop_container(job)
-					if job.log is None or len(job.log) == 0:
-						job.log = 'exited'
-			self.client.containers.prune()
 		except docker.errors.APIError as e:
-			if 'a prune operation is already running' in e.explanation:  # ghetto
 				return False
-			raise docker.errors.APIError(e)
 
 	def get_logs(self, job):
 		container = self.get_container(job)
@@ -226,5 +225,6 @@ class Worker:
 	def append(self, new_job):
 		if not isinstance(new_job, dict) or any(attribute not in new_job for attribute in job.attributes):
 			raise TypeError
-		self.jobs.append(job.Job(id=new_job['id'], container=new_job['container'], driver=new_job['driver'], site=new_job['site'],
-		                         status=new_job['status'], tag=new_job['tag'], log=new_job['log']))
+		self.jobs.append(
+			job.Job(id=new_job['id'], container=new_job['container'], driver=new_job['driver'], site=new_job['site'],
+			        status=new_job['status'], tag=new_job['tag'], log=new_job['log']))
