@@ -18,7 +18,7 @@ class Worker:
 		self.hub = None
 		self.jobs = []
 		self.container_options = {'links': {'hub': 'hub'}, 'shm_size': '2G', 'detach': True}
-		self.last_job_request_time = 0
+		self.last_job_request = 0
 
 	def __del__(self):
 		self.prune()
@@ -119,6 +119,11 @@ class Worker:
 
 	def prune(self):
 		try:
+			for job in self.jobs:
+				if job.container is not None and job.status in ('rm', 'error', 'failed', 'done'):
+					self.stop_container(job)
+					if job.log is None or len(job.log) == 0:
+						job.log = 'exited'
 			self.client.containers.prune()
 		except docker.errors.APIError as e:
 			if 'a prune operation is already running' in e.explanation:  # ghetto
@@ -211,10 +216,10 @@ class Worker:
 				return job
 
 	def should_request_work(self):
-		if time.time() - self.last_job_request_time < 3 or self.can_run_more():
+		if time.time() - self.last_job_request < 3 or self.can_run_more():
 			return False
 		if len(self.jobs) == 0:
-			self.last_job_request_time = time.time()
+			self.last_job_request = time.time()
 			return True
 		return False
 
