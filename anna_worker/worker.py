@@ -60,13 +60,7 @@ class Worker:
 				self.stop_container(job)
 				self.jobs.pop(job)
 			elif job.status in ('starting', 'running') and not self.is_running(job):
-				self.complete_job(job)
-			elif job.status == 'done':
-				container = self.get_container(job)
-				if container:
-					if container.status != 'exited':
-						container.stop()
-					container.remove()
+				self.update_job(job)
 
 	def is_running(self, job):
 		"""
@@ -81,13 +75,9 @@ class Worker:
 		return False
 
 	def get_running(self):
-		result = []
-		for job in self.jobs:
-			if self.is_running(job):
-				result.append(job)
-		return result
+		return [job for job in self.jobs if self.is_running(job)]
 
-	def complete_job(self, job):
+	def update_job(self, job):
 		self.get_logs(job)
 		# TODO: This is a temporary hack
 		result = job.log.rstrip().split('\n')[-1].split('/')
@@ -110,7 +100,7 @@ class Worker:
 			self.get_logs(job)
 			if container.status == 'running':
 				container.stop()
-				container.remove()
+			container.remove()
 
 	def get_container(self, job):
 		if job.container is None:
@@ -118,6 +108,8 @@ class Worker:
 		try:
 			return self.client.containers.get(job.container)
 		except docker.errors.NotFound:
+			return False
+		except docker.errors.NullResource:
 			return False
 
 	def prune(self):
@@ -217,7 +209,7 @@ class Worker:
 	def should_request_work(self):
 		if time.time() - self.last_job_request < 3 or self.can_run_more():
 			return False
-		if len(self.jobs) == 0:
+		if len([job for job in self.jobs if job.status in ('pending', 'starting', 'running')]) < self.max_concurrent:
 			self.last_job_request = time.time()
 			return True
 		return False

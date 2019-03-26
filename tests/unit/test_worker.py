@@ -25,8 +25,6 @@ class TestWorker(unittest.TestCase):
 		self.assertEqual('running', self.worker.get_container(job).status)
 		self.assertNotEqual(False, self.worker.get_container(job))
 		self.worker.stop_container(job)
-		self.assertEqual('exited', self.worker.get_container(job).status)
-		self.worker.prune()
 		self.assertEqual(False, self.worker.get_container(job))
 
 	def test_start_next_job(self):
@@ -88,7 +86,7 @@ class TestWorker(unittest.TestCase):
 		self.assertNotEqual(False, self.worker.get_container(job))
 		self.assertEqual('running', self.worker.get_container(job).status)
 		self.worker.stop_container(job)
-		self.assertEqual('exited', self.worker.get_container(job).status)
+		self.assertEqual(False, self.worker.get_container(job))
 
 	def test_running(self):
 		job = copy.copy(self.mock_firefox)

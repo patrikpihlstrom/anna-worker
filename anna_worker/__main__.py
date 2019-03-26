@@ -7,7 +7,7 @@ from worker import Worker
 from anna_client.client import Client
 
 client = Client(host=os.environ['ANNA_HOST'], token=os.environ['ANNA_TOKEN'])
-worker = Worker(max_concurrent=2)
+worker = Worker(max_concurrent=4)
 last_status_check = 0
 
 
@@ -26,6 +26,7 @@ def update():
 		for job in worker.jobs:
 			if job.changed:
 				if job.status in ('done', 'failed', 'error', 'rm'):
+					worker.stop_container(job)
 					worker.jobs.remove(job)
 				else:
 					job.changed = False
@@ -33,16 +34,17 @@ def update():
 
 def remove_manually_stopped_jobs_from_host():
 	jobs = client.query({'id': [job.id for job in worker.jobs]})
-	for job in jobs:
-		if job is None or job['status'] == 'rm':
-			job.status = 'rm'
+	if isinstance(jobs, list):
+		for job in jobs:
+			if job is None or job['status'] == 'rm':
+				job.status = 'rm'
 
 
 def request_work():
 	if worker.should_request_work():
-		job = client.request_job()
-		if isinstance(job, dict):
-			worker.append(job)
+		job = client.request_job(worker.max_concurrent - len(worker.get_running()))
+		if isinstance(job, list) and len(job) > 0:
+			worker.append(job[0])
 		remove_manually_stopped_jobs_from_host()
 
 
