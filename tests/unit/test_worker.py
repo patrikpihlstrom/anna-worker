@@ -7,8 +7,8 @@ from anna_worker.job import Job
 
 class TestWorker(unittest.TestCase):
 	def setUp(self):
-		self.mock_firefox = Job(driver='firefox', site='test', status='pending')
-		self.mock_chrome = Job(driver='chrome', site='test', status='pending')
+		self.mock_firefox = Job(driver='firefox', site='test', status='PENDING')
+		self.mock_chrome = Job(driver='chrome', site='test', status='PENDING')
 		self.worker = Worker(2)
 		self.worker.keep_hub_alive()
 
@@ -39,7 +39,6 @@ class TestWorker(unittest.TestCase):
 		self.worker.jobs.append(copy.copy(self.mock_chrome))
 		for job in self.worker.jobs:
 			self.worker.start_job(job)
-			self.assertNotEqual('', job.tag)
 			self.assertNotEqual('', job.container)
 			self.assertIsNotNone(self.worker.client.containers.get(job.container).id)
 
@@ -61,22 +60,6 @@ class TestWorker(unittest.TestCase):
 		self.assertEqual('', job.log)
 		#self.assertTrue(os.path.isdir('/tmp/anna/' + job.tag))
 		#self.assertTrue(os.path.isfile('/tmp/anna/' + job.tag + '/anna.log'))
-
-	def test_complete_job(self):
-		job = copy.copy(self.mock_firefox)
-		self.worker.jobs.append(job)
-		self.assertEqual('pending', job.status)
-		self.worker.complete_job(job)
-		self.assertIn(job.status, ('done', 'error', 'failed'))
-		self.assertEqual('unable to get logs from container', job.log)
-		job = copy.copy(self.mock_firefox)
-		self.worker.jobs.append(job)
-		self.assertEqual('pending', job.status)
-		self.worker.start_job(job)
-		self.assertEqual('running', job.status)
-		self.worker.complete_job(job)
-		self.assertIn(job.status, ('done', 'error', 'failed'))
-		self.assertNotEqual('unable to get logs from container', job.log)
 
 	def test_stop_container(self):
 		job = copy.copy(self.mock_firefox)
@@ -108,9 +91,9 @@ class TestWorker(unittest.TestCase):
 		self.worker.update_jobs()
 		self.assertIsStartedJob(self.mock_firefox, job)
 		self.worker.stop_container(job)
-		self.assertNotEqual('done', job.status)
+		self.assertNotEqual('DONE', job.status)
 		self.worker.update_jobs()
-		self.assertIn(job.status, ('done', 'error', 'failed'))
+		self.assertIn(job.status, ('DONE', 'ERROR'))
 
 	def test_keep_hub_alive(self):
 		self.assertEqual('running', self.worker.client.containers.get(self.worker.hub.id).status)
@@ -125,10 +108,9 @@ class TestWorker(unittest.TestCase):
 	def test_before_start(self):
 		job = copy.copy(self.mock_firefox)
 		self.worker.jobs.append(job)
-		self.assertEqual('pending', job.status)
+		self.assertEqual('PENDING', job.status)
 		self.worker.before_start(job)
-		self.assertEqual('starting', job.status)
-		self.assertEqual('-'.join((job.driver, job.site)), job.tag)
+		self.assertEqual('STARTING', job.status)
 		job.driver = 'edge'
 		with self.assertRaises(TypeError):
 			self.worker.before_start(job)
@@ -137,11 +119,9 @@ class TestWorker(unittest.TestCase):
 
 	def test_after_start(self):
 		job = self.test_before_start()
-		self.assertEqual('starting', job.status)
-		self.assertEqual('-'.join((job.driver, job.site)), job.tag)
+		self.assertEqual('STARTING', job.status)
 		self.worker.after_start(job)
-		self.assertEqual('running', job.status)
-		self.assertEqual('-'.join((job.driver, job.site, job.container)), job.tag)
+		self.assertEqual('RUNNING', job.status)
 
 	def assertIsStartedJob(self, mock, job, id=None):
 		self.assertEqual(mock.driver, job.driver)
@@ -151,8 +131,7 @@ class TestWorker(unittest.TestCase):
 			self.assertEqual(id, job.id)
 		self.assertNotEqual('', job.container)
 		self.assertEqual('', job.log)
-		self.assertEqual('-'.join((job.driver, job.site, job.container)), job.tag)
-		self.assertIn(job.status, ['starting', 'running', 'done'])
+		self.assertIn(job.status, ['STARTING', 'RUNNING', 'DONE'])
 		self.assertIsNotNone(self.worker.client.containers.get(job.container).id)
 
 	def assertIsNewJob(self, mock, job, id=None):
@@ -163,5 +142,5 @@ class TestWorker(unittest.TestCase):
 			self.assertEqual(id, job.id)
 		self.assertEqual('', job.container)
 		self.assertEqual('', job.log)
-		self.assertEqual('pending', job.status)
+		self.assertEqual('PENDING', job.status)
 		self.assertIsNotNone(job.log)

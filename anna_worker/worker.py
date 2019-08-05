@@ -1,10 +1,11 @@
 import re
+import socket
 import time
 
 import docker
 from docker import errors
 
-import job
+from anna_worker import job
 
 
 class Worker:
@@ -44,7 +45,7 @@ class Worker:
 			except docker.errors.NotFound:
 				try:
 					self.hub = self.client.containers.run('selenium/hub', name='hub', ports={'4444/tcp': 4444},
-					                                      detach=True)
+														  detach=True)
 				except docker.errors.APIError:
 					self.hub.stop()
 					self.keep_hub_alive()
@@ -52,15 +53,8 @@ class Worker:
 			pass
 
 	def update_jobs(self):
-		"""
-		Get all jobs that have exited for one reason or another and remove their containers
-		"""
 		for job in self.jobs:
-			if job.status == 'rm':
-				self.stop_container(job)
-				self.jobs.pop(job)
-			elif job.status in ('starting', 'running') and not self.is_running(job):
-				self.update_job(job)
+			self.update_job(job)
 
 	def is_running(self, job):
 		"""
@@ -68,7 +62,7 @@ class Worker:
 		:param job:
 		:return:
 		"""
-		if job.container is not None and len(job.container) > 0:
+		if job.container is not None:
 			container = self.get_container(job)
 			if container is not False:
 				return container.status in ('starting', 'running')
@@ -78,26 +72,20 @@ class Worker:
 		return [job for job in self.jobs if self.is_running(job)]
 
 	def update_job(self, job):
-		self.get_logs(job)
-		# TODO: This is a temporary hack
-		result = job.log.rstrip().split('\n')[-1].split('/')
-		if len(result) < 2:
-			job.status = 'error'
-		else:
-			try:
-				if len(result) != 2 or int(result[0]) != int(result[1]):
-					job.status = 'failed'
-				else:
-					job.status = 'done'
-			except ValueError:
-				job.status = 'error'
+		job.log = self.get_logs(job)
+		if not self.is_running(job) and job.container is not None:
+			container = self.get_container(job)
+			if container.status == 'exited' and container.attrs['State']['ExitCode'] == 0:
+				job.status = 'DONE'
+			else:
+				job.status = 'FAILED'
 
 		job.changed = True
 
 	def stop_container(self, job):
 		container = self.get_container(job)
 		if container is not False:
-			self.get_logs(job)
+			job.log = self.get_logs(job)
 			if container.status == 'running':
 				container.stop()
 			container.remove()
@@ -116,19 +104,17 @@ class Worker:
 		try:
 			for job in self.jobs:
 				if job.log is None and job.container is not None and job.status in (
-						'rm', 'error', 'failed', 'done'):
+						'STOPPED', 'ERROR', 'DONE'):
 					self.stop_container(job)
 		except docker.errors.APIError as e:
-				return False
+			return False
 
 	def get_logs(self, job):
 		container = self.get_container(job)
 		if container is not False:
-			job.log = re.sub("\\x1b\[0m|\\x1b\[92m|\\x1b\[91m|\\x1b\[93m", '',
-			                 container.logs().decode('utf-8'))  # colorless
+			return re.sub("\\x1b\[0m|\\x1b\[92m|\\x1b\[91m|\\x1b\[93m", '', container.logs().decode('utf-8'))  # colorless
 		else:
-			job.log = 'unable to get logs from container'
-		job.changed = True
+			return 'unable to get logs from container'
 
 	def can_run_more(self):
 		"""
@@ -160,8 +146,7 @@ class Worker:
 		if job.driver not in ('chrome', 'firefox'):
 			raise TypeError('desired driver(s) not supported: ' + job.driver)
 
-		job.status = 'starting'
-		job.tag = '-'.join((job.driver, job.site))
+		job.status = 'STARTING'
 		job.changed = True
 
 	def __start__(self, job):
@@ -175,8 +160,7 @@ class Worker:
 		:param job:
 		:return:
 		"""
-		job.status = 'running'
-		job.tag = '-'.join((job.driver, job.site, job.container))
+		job.status = 'RUNNING'
 		job.changed = True
 
 	def start_job(self, job):
@@ -203,13 +187,14 @@ class Worker:
 
 	def get_next_job(self):
 		for job in self.jobs:
-			if job.status == 'pending':
+			if job.status in ('PENDING', 'RESERVED'):
 				return job
 
 	def should_request_work(self):
-		if time.time() - self.last_job_request < 3 or self.can_run_more():
+		if time.time() - self.last_job_request < 3:
 			return False
-		if len([job for job in self.jobs if job.status in ('pending', 'starting', 'running')]) < self.max_concurrent:
+		if len([job for job in self.jobs if
+				job.status in ('PENDING', 'STARTING', 'RUNNING', 'RESERVED')]) < self.max_concurrent:
 			self.last_job_request = time.time()
 			return True
 		return False
@@ -219,4 +204,8 @@ class Worker:
 			raise TypeError
 		self.jobs.append(
 			job.Job(id=new_job['id'], container=new_job['container'], driver=new_job['driver'], site=new_job['site'],
-			        status=new_job['status'], tag=new_job['tag'], log=new_job['log']))
+					status=new_job['status'], worker=socket.gethostname(), log=new_job['log']))
+
+	def remove(self, job):
+		self.stop_container(job=job)
+		self.jobs.remove(tuple(j for j in self.jobs if j['id'] == job['id'])[0])
