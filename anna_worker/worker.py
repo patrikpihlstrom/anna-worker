@@ -28,8 +28,6 @@ class Worker:
 	def update(self):
 		self.keep_hub_alive()  # Make sure the hub is running
 		self.update_jobs()  # Retrieve logs & handle containers
-		if self.can_run_more():  # Check if we can run more concurrent containers
-			self.start_next_job()  # Get the next job in the queue and fire up a container
 
 	def keep_hub_alive(self):
 		"""
@@ -72,15 +70,8 @@ class Worker:
 		return [job for job in self.jobs if self.is_running(job)]
 
 	def update_job(self, job):
-		job.log = self.get_logs(job)
 		if not self.is_running(job) and job.container is not None:
-			container = self.get_container(job)
-			if container.status == 'exited' and container.attrs['State']['ExitCode'] == 0:
-				job.status = 'DONE'
-			else:
-				job.status = 'FAILED'
-
-		job.changed = True
+			self.remove(job)
 
 	def stop_container(self, job):
 		container = self.get_container(job)
@@ -103,8 +94,7 @@ class Worker:
 	def prune(self):
 		try:
 			for job in self.jobs:
-				if job.log is None and job.container is not None and job.status in (
-						'STOPPED', 'ERROR', 'DONE'):
+				if job.container is not None and not self.is_running(job):
 					self.stop_container(job)
 		except docker.errors.APIError as e:
 			return False
@@ -126,16 +116,6 @@ class Worker:
 		running = len(self.get_running())
 		return queue_length - running > 0 and running < self.max_concurrent
 
-	def start_next_job(self):
-		"""
-		Starts the next pending job in the queue
-		"""
-		job = self.get_next_job()
-		if job is not None:
-			self.start_job(job)
-			return job
-		return False
-
 	@staticmethod
 	def before_start(job):
 		"""
@@ -146,12 +126,8 @@ class Worker:
 		if job.driver not in ('chrome', 'firefox'):
 			raise TypeError('desired driver(s) not supported: ' + job.driver)
 
-		job.status = 'STARTING'
-		job.changed = True
-
 	def __start__(self, job):
 		job.container = str(self.run_container(job).short_id)
-		job.changed = True
 
 	@staticmethod
 	def after_start(job):
@@ -160,8 +136,7 @@ class Worker:
 		:param job:
 		:return:
 		"""
-		job.status = 'RUNNING'
-		job.changed = True
+		pass
 
 	def start_job(self, job):
 		"""
@@ -185,16 +160,8 @@ class Worker:
 			detach=self.container_options['detach'],
 			command=command)
 
-	def get_next_job(self):
-		for job in self.jobs:
-			if job.status in ('PENDING', 'RESERVED'):
-				return job
-
 	def should_request_work(self):
-		if time.time() - self.last_job_request < 3:
-			return False
-		if len([job for job in self.jobs if
-				job.status in ('PENDING', 'STARTING', 'RUNNING', 'RESERVED')]) < self.max_concurrent:
+		if len(self.jobs) < self.max_concurrent and time.time() - self.last_job_request > 3:
 			self.last_job_request = time.time()
 			return True
 		return False
@@ -203,8 +170,8 @@ class Worker:
 		if not isinstance(new_job, dict) or any(attribute not in new_job for attribute in job.attributes):
 			raise TypeError
 		self.jobs.append(
-			job.Job(id=new_job['id'], container=new_job['container'], driver=new_job['driver'], site=new_job['site'],
-					status=new_job['status'], worker=socket.gethostname(), log=new_job['log']))
+			job.Job(id=new_job['id'], container=new_job['container'], driver=new_job['driver'], site=new_job['site'], worker=socket.gethostname()))
+		self.start_job(self.jobs[len(self.jobs) - 1])
 
 	def remove(self, job):
 		self.stop_container(job=job)
