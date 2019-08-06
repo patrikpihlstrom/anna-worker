@@ -29,7 +29,9 @@ def request_work():
 		client.reserve_jobs(worker=socket.gethostname(), job_ids=ids)
 		if isinstance(jobs, list) and len(jobs) > 0:
 			for job in jobs:
-				worker.append(job)
+				container = worker.append(job)
+				if len(container) > 0 and isinstance(container, str):
+					client.update_jobs(where={'id': job['id']}, data={'container': container})
 
 
 if __name__ == '__main__':

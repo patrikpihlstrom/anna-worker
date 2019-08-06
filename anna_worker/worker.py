@@ -128,6 +128,7 @@ class Worker:
 
 	def __start__(self, job):
 		job.container = str(self.run_container(job).short_id)
+		return job.container
 
 	@staticmethod
 	def after_start(job):
@@ -143,8 +144,9 @@ class Worker:
 		Starts the next pending job in the queue
 		"""
 		self.before_start(job)
-		self.__start__(job)
+		container = self.__start__(job)
 		self.after_start(job)
+		return container
 
 	def run_container(self, job):
 		"""
@@ -171,7 +173,7 @@ class Worker:
 			raise TypeError
 		self.jobs.append(
 			job.Job(id=new_job['id'], container=new_job['container'], driver=new_job['driver'], site=new_job['site'], worker=socket.gethostname()))
-		self.start_job(self.jobs[len(self.jobs) - 1])
+		return self.start_job(self.jobs[len(self.jobs) - 1])
 
 	def remove(self, job):
 		self.stop_container(job=job)
