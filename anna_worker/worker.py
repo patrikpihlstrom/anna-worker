@@ -175,4 +175,4 @@ class Worker:
 
 	def remove(self, job):
 		self.stop_container(job=job)
-		self.jobs.remove(tuple(j for j in self.jobs if j['id'] == job['id'])[0])
+		self.jobs.remove(tuple(j for j in self.jobs if j.id == job.id)[0])

@@ -5,7 +5,7 @@ with open('README.md', 'r') as f:
 
 setuptools.setup(
     name='anna-worker',
-    version='0.0.10',
+    version='0.0.11',
     author='Patrik Pihlstrom',
     author_email='patrik.pihlstrom@gmail.com',
     url='https://github.com/patrikpihlstrom/anna-worker',
