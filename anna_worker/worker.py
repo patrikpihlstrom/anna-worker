@@ -3,6 +3,7 @@ import socket
 import time
 
 import docker
+import requests
 from docker import errors
 
 from anna_worker import job
@@ -89,6 +90,10 @@ class Worker:
 		except docker.errors.NotFound:
 			return False
 		except docker.errors.NullResource:
+			return False
+		except docker.errors.APIError:
+			return False
+		except requests.exceptions.ReadTimeout:
 			return False
 
 	def prune(self):
