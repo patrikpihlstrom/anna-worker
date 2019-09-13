@@ -29,6 +29,7 @@ class Worker:
 	def update(self):
 		self.keep_hub_alive()  # Make sure the hub is running
 		self.update_jobs()  # Retrieve logs & handle containers
+		self.prune()
 
 	def keep_hub_alive(self):
 		"""
@@ -103,6 +104,7 @@ class Worker:
 					self.stop_container(job)
 		except docker.errors.APIError as e:
 			return False
+		self.client.containers.prune()
 
 	def get_logs(self, job):
 		container = self.get_container(job)
@@ -148,10 +150,13 @@ class Worker:
 		"""
 		Starts the next pending job in the queue
 		"""
-		self.before_start(job)
-		container = self.__start__(job)
-		self.after_start(job)
-		return container
+		try:
+			self.before_start(job)
+			container = self.__start__(job)
+			self.after_start(job)
+			return container
+		except TypeError:
+			return ''
 
 	def run_container(self, job):
 		"""

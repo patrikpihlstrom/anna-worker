@@ -10,3 +10,5 @@ dist
 anna_api.egg-info
 *.swp
 .coverage
+anna_worker.egg-info/
+uri
