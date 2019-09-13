@@ -22,7 +22,9 @@ def update():
 
 def request_work():
 	if worker.should_request_work():
-		jobs = client.get_jobs(where={'status': 'PENDING'}, fields=('id', 'site', 'driver', 'status', 'worker', 'container'))
+		fields = ('id', 'site', 'driver', 'status', 'worker', 'container')
+		limit = worker.max_concurrent - len(worker.jobs)
+		jobs = client.get_jobs(where={'status': 'PENDING'}, fields=fields, limit=limit)
 		ids = tuple(job['id'] for job in jobs if job['worker'] is None)
 		if len(ids) < 1:
 			return
