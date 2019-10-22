@@ -22,6 +22,10 @@ class Http(BaseHTTPRequestHandler):
 	def do_HEAD(self):
 		self._set_headers()
 
+	def do_GET(self):
+		self._set_headers()
+		self.wfile.write(self._html("What is thy bidding"))
+
 	def do_POST(self):
 		content_length = int(self.headers['Content-Length'])
 		post_data = self.rfile.read(content_length)
