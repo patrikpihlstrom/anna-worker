@@ -1,5 +1,7 @@
 import re
 import socket
+from queue import Queue
+
 import time
 
 import docker
@@ -21,6 +23,7 @@ class Worker:
 		self.jobs = []
 		self.container_options = {'links': {'hub': 'hub'}, 'shm_size': '2G', 'detach': True}
 		self.last_job_request = 0
+		self.queue = Queue()
 
 	def __del__(self):
 		self.prune()
@@ -172,11 +175,8 @@ class Worker:
 			detach=self.container_options['detach'],
 			command=command)
 
-	def should_request_work(self):
-		if len(self.jobs) < self.max_concurrent and time.time() - self.last_job_request > 3:
-			self.last_job_request = time.time()
-			return True
-		return False
+	def available(self):
+		return len(self.jobs) < self.max_concurrent
 
 	def append(self, new_job):
 		if not isinstance(new_job, dict) or any(attribute not in new_job for attribute in job.attributes):
