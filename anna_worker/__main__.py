@@ -24,7 +24,7 @@ class Http(BaseHTTPRequestHandler):
 
 	def do_GET(self):
 		self._set_headers()
-		self.wfile.write(self._html("What is thy bidding"))
+		self.wfile.write('What is thy bidding'.encode('utf-8'))
 
 	def do_POST(self):
 		content_length = int(self.headers['Content-Length'])
