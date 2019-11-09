@@ -12,3 +12,4 @@ anna_api.egg-info
 .coverage
 anna_worker.egg-info/
 uri
+config.yml
