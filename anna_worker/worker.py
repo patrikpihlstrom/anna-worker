@@ -6,7 +6,7 @@ import docker
 import requests
 from docker import errors
 
-from anna_worker import job
+import job
 
 
 class Worker:
@@ -14,14 +14,15 @@ class Worker:
     This module handles communication between the job queue and docker
     """
 
-    def __init__(self, max_concurrent=2):
+    def __init__(self, config):
         self.client = docker.from_env()
-        self.max_concurrent = max_concurrent
+        self.max_concurrent = config['docker']['max_concurrent_containers']
         self.hub = None
         self.jobs = []
-        self.container_options = {'links': {'hub': 'hub'}, 'shm_size': '2G', 'detach': True}
+        self.container_options = {'links': {'anna-worker_selenium_hub': 'hub'}, 'shm_size': '2G', 'detach': True}
         self.last_job_request = 0
         self.queue = Queue()
+        self.config = config
 
     def __del__(self):
         self.prune()
@@ -39,13 +40,13 @@ class Worker:
         """
         try:
             try:
-                self.hub = self.client.containers.get('hub')
+                self.hub = self.client.containers.get('anna-worker_selenium_hub')
                 if self.hub.status != 'running':
                     self.hub.remove()
                     self.keep_hub_alive()
             except docker.errors.NotFound:
                 try:
-                    self.hub = self.client.containers.run('selenium/hub', name='hub', ports={'4444/tcp': 4444},
+                    self.hub = self.client.containers.run('selenium/hub', name='anna-worker_selenium_hub', ports={'4444/tcp': 4444},
                                                           detach=True)
                 except docker.errors.APIError:
                     self.hub.stop()
@@ -182,7 +183,7 @@ class Worker:
             raise TypeError
         self.jobs.append(
             job.Job(id=new_job['id'], container=new_job['container'], driver=new_job['driver'], site=new_job['site'],
-                    worker=socket.gethostname()))
+                    worker=socket.gethostname(), host=self.config['api']['host'], token=self.config['api']['token']))
         return self.start_job(self.jobs[len(self.jobs) - 1])
 
     def remove(self, job):
